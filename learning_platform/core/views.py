@@ -554,11 +554,13 @@ def generate_learning_paths(request):
     prompt = (
         f"You are an expert educator designing structure learning paths for students."
         f"Generate multiple logical learning paths for {user_input}, each containing 5-8 modules."
-        f"Output in structured JSON format with 'learning_paths as an array, each having 'path_name' and 'modules'."
+        f"Return output strictly in JSON format: {{ 'learning_paths': [{{ 'path_name': '', 'modules': [''] }}] }}."
     )
     
     try:
         response = model.generate_content(prompt)
+        response_text = response.candidates[0].content.parts[0].text
+        
         data = json.loads(response.text) # Parse AI response into JSON
         
         for path in data.get("learning_paths", []):
@@ -568,6 +570,9 @@ def generate_learning_paths(request):
                 Module.objects.get_or_create(learning_path=learning_path, module_name=module_name)
                 
         return Response({"message": "Learning paths generated successfully!", "learning_paths": data["learning_paths"]}, status=201)
+    
+    except json.JSONDecodeError:
+        return Response({"error": "Failed to parse AI response."}, status=500)
 
     except Exception as e:
         return Response({"error": str(e)}, status=500)
