@@ -29,8 +29,13 @@ from rest_framework.decorators import action
 from .services.quiz_generation_service import (
     fetch_video_transcript, fetch_video_description, generate_quiz_with_chat_api, generate_default_quiz, generate_quiz_from_module
 )
+import os
+import json
+import google.generativeai as genai
 import logging
 logger = logging.getLogger(__name__)
+
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 User = get_user_model()  # This will import the custom User model
 
@@ -534,3 +539,35 @@ def generate_quiz_from_video(request, module_id):
         print(f"Error generating quiz: {e}")
         return Response({"error": str(e)}, status=500)
 
+@api_view(["POST"])
+def generate_learning_paths(request):
+    user_input = request.data.get("course_name", "").strip() # Get course name from user
+    
+    if not user_input:
+        return Response({"error": "Course name is required."}, status=400)
+    
+    # Check if course already exists
+    course, _ = Course.object.get_or_create(name=user_input)
+    
+    # AI Prompt
+    model = genai.GenerativeModel("gemini-pro")
+    prompt = (
+        f"You are an expert educator designing structure learning paths for students."
+        f"Generate multiple logical learning paths for {user_input}, each containing 5-8 modules."
+        f"Output in structured JSON format with 'learning_paths as an array, each having 'path_name' and 'modules'."
+    )
+    
+    try:
+        response = model.generate_content(prompt)
+        data = json.loads(response.text) # Parse AI response into JSON
+        
+        for path in data.get("learning_paths", []):
+            learning_path, _ = LearningPath.objects.get_or_create(course=course, path_name=path["path_name"])
+            
+            for module_name in path["modules"]:
+                Module.objects.get_or_create(learning_path=learning_path, module_name=module_name)
+                
+        return Response({"message": "Learning paths generated successfully!", "learning_paths": data["learning_paths"]}, status=201)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)

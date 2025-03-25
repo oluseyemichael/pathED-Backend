@@ -13,7 +13,7 @@ from core.views import (
     CourseViewSet, ModuleViewSet, QuizViewSet, LearningPathViewSet, 
     RegisterView, LoginView, VerifyEmailView, PasswordResetRequestView,
     PasswordResetConfirmView, ModuleProgressViewSet, QuizProgressViewSet,
-    CourseProgressViewSet, get_user_profile, update_course_progress, get_module_by_name, submit_quiz, LearningPathProgressViewSet, get_module_progress, get_next_learning_path, generate_quiz_from_video
+    CourseProgressViewSet, get_user_profile, update_course_progress, get_module_by_name, submit_quiz, LearningPathProgressViewSet, get_module_progress, get_next_learning_path, generate_quiz_from_video, generate_learning_paths
 )
 
 # Versioned Router Setup for API
@@ -58,6 +58,7 @@ urlpatterns = [
     path('api/v1/quizzes/<int:quiz_id>/submit/', submit_quiz, name='submit_quiz'),
     path('api/v1/module-progress', get_module_progress, name='get_module_progress'),
     path('api/v1/next-learning-path/<int:current_learning_path_id>/', get_next_learning_path, name='get_next_learning_path'),
+    path("generate-learning-paths/", generate_learning_paths, name="generate_learning_paths"),
     # Versioned router endpoint
     path('api/v1/', include(router.urls)),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
