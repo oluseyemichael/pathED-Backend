@@ -547,7 +547,7 @@ def generate_learning_paths(request):
         return Response({"error": "Course name is required."}, status=400)
     
     # Check if course already exists
-    course, _ = Course.objects.get_or_create(name=user_input)
+    course, _ = Course.objects.get_or_create(course_name=user_input)
     
     # AI Prompt
     model = genai.GenerativeModel("gemini-pro")
