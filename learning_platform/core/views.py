@@ -552,16 +552,21 @@ def generate_learning_paths(request):
     # AI Prompt
     model = genai.GenerativeModel("gemini-2.0-flash")
     prompt = (
-        f"You are an expert educator designing structure learning paths for students."
-        f"Generate multiple logical learning paths for {user_input}, each containing 5-8 modules."
-        f"Return output strictly in JSON format: {{ 'learning_paths': [{{ 'path_name': '', 'modules': [''] }}] }}."
+        f"You are an expert educator designing structured learning paths for students."
+        f"Generate multiple learning paths for {user_input}, each containing 5-8 modules."
+        f"Return output **only in JSON format** with this structure:\n\n"
+        f'{{ "learning_paths": [{{ "path_name": "string", "modules": ["string"] }}] }}'
     )
     
     try:
         response = model.generate_content(prompt)
+        
+        # Print raw response for debugging
+        print("RAW RESPONSE:", response)
+        
         response_text = response.candidates[0].content.parts[0].text
         
-        data = json.loads(response.text) # Parse AI response into JSON
+        data = json.loads(response_text) # Parse AI response into JSON
         
         for path in data.get("learning_paths", []):
             learning_path, _ = LearningPath.objects.get_or_create(course=course, path_name=path["path_name"])
