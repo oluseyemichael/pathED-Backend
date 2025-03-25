@@ -550,7 +550,7 @@ def generate_learning_paths(request):
     course, _ = Course.objects.get_or_create(course_name=user_input)
     
     # AI Prompt
-    model = genai.GenerativeModel("gemini-pro")
+    model = genai.GenerativeModel("gemini-2.0-flash")
     prompt = (
         f"You are an expert educator designing structure learning paths for students."
         f"Generate multiple logical learning paths for {user_input}, each containing 5-8 modules."
