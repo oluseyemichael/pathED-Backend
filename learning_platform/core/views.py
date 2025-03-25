@@ -564,7 +564,13 @@ def generate_learning_paths(request):
         # Print raw response for debugging
         print("RAW RESPONSE:", response)
         
-        response_text = response.candidates[0].content.parts[0].text
+    
+        if hasattr(response, "candidates") and response.candidates:
+            response_text = response.candidates[0].content.parts[0].text
+        else:
+            return Response({"error": "Unexpected AI response structure."}, status=500)
+
+        print("EXTRACTED TEXT:", response_text)  # Debugging output
         
         data = json.loads(response_text) # Parse AI response into JSON
         
