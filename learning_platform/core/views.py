@@ -592,31 +592,30 @@ def generate_learning_paths(request):
                 course, _ = Course.objects.get_or_create(course_name=user_input)
                 
                 # Bulk create learning paths
-                paths = [LearningPath(course=course, path_name=lp["path_name"]) 
-                        for lp in data["learning_paths"]]  # Fixed indentation
-                LearningPath.objects.bulk_create(paths, ignore_conflicts=True)
+                learning_paths = []
+                for lp in data["learning_paths"]:
+                    path, created = LearningPath.objects.get_or_create(
+                        course=course,
+                        path_name=lp["path_name"],
+                        defaults={'course': course}
+                    )
+                    learning_paths.append(path)
                 
                 # Bulk create modules
                 modules = []
-                for lp in data["learning_paths"]:
-                    learning_path = LearningPath.objects.get(
-                        course=course, 
-                        path_name=lp["path_name"]
-                    )
-                    # FIX: Changed mod["name"] to mod["module_name"]
-                    modules.extend([
-                        Module(
+                for lp_data, learning_path in zip(data["learning_paths"], learning_paths):
+                    for mod in lp_data["modules"]:
+                        modules.append(Module(
                             learning_path=learning_path,
-                            module_name=mod["module_name"],  # CORRECTED KEY
+                            module_name=mod["module_name"],
                             topic=mod["topic"]
-                        ) for mod in lp["modules"]
-                    ])
-                
+                        ))
+
                 Module.objects.bulk_create(
                     modules,
-                    update_conflicts=True,  # Added to update existing entries
+                    update_conflicts=True,
                     unique_fields=['learning_path', 'module_name'],
-                    update_fields=['topic']  # Update topic if module exists
+                    update_fields=['topic']
                 )
 
             # Cache Setup

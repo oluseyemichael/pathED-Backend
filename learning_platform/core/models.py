@@ -65,6 +65,9 @@ class LearningPath(models.Model):
     path_name = models.CharField(max_length=255)
     course = models.ForeignKey(Course, related_name='learning_paths', on_delete=models.CASCADE)
     date_created = models.DateTimeField(default=timezone.now)
+    
+    class Meta:
+        unique_together = ('course', 'path_name')
 
     def __str__(self):
         return self.path_name
