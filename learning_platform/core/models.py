@@ -67,7 +67,12 @@ class LearningPath(models.Model):
     date_created = models.DateTimeField(default=timezone.now)
     
     class Meta:
-        unique_together = ('course', 'path_name')
+            constraints = [
+                models.UniqueConstraint(
+                    fields=['course', 'path_name'],
+                    name='unique_course_path'
+                )
+            ]
 
     def __str__(self):
         return self.path_name
@@ -79,6 +84,14 @@ class Module(models.Model):
     topic = models.TextField()
     video_link = models.CharField(max_length=500, blank=True)
     blog_link = models.CharField(max_length=500, blank=True)
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['learning_path', 'module_name'],
+                name='unique_path_module'
+            )
+        ]
 
     @circuit_breaker()
     def save(self, *args, **kwargs):

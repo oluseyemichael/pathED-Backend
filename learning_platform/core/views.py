@@ -594,30 +594,45 @@ def generate_learning_paths(request):
                 course, _ = Course.objects.get_or_create(course_name=user_input)
                 
                 # Bulk create learning paths
-                learning_paths = []
-                for lp in data["learning_paths"]:
-                    path, created = LearningPath.objects.get_or_create(
+                learning_paths_to_create = [
+                    LearningPath(
                         course=course,
-                        path_name=lp["path_name"],
-                        defaults={'course': course}
-                    )
-                    learning_paths.append(path)
+                        path_name=lp["path_name"]
+                    ) for lp in data["learning_paths"]
+                ]
+                
+                LearningPath.objects.bulk_create(
+                    learning_paths_to_create,
+                    update_conflicts=True,
+                    update_fields=['path_name'],  # Field to update if conflict
+                    unique_fields=['course', 'path_name']  # Must match model constraint
+                )
+                
+                # Get all paths for the course (including existing ones)
+                learning_paths = LearningPath.objects.filter(course=course)
                 
                 # Bulk create modules
-                modules = []
-                for lp_data, learning_path in zip(data["learning_paths"], learning_paths):
-                    for mod in lp_data["modules"]:
-                        modules.append(Module(
-                            learning_path=learning_path,
-                            module_name=mod["module_name"],
-                            topic=mod["topic"]
-                        ))
-
+                modules_to_create = []
+                for lp in learning_paths:
+                    path_data = next(
+                        item for item in data["learning_paths"] 
+                        if item["path_name"] == lp.path_name
+                    )
+                    
+                    for mod in path_data["modules"]:
+                        modules_to_create.append(
+                            Module(
+                                learning_path=lp,
+                                module_name=mod["module_name"],
+                                topic=mod["topic"][:300]  # Truncate to 300 chars
+                            )
+                        )
+                
                 Module.objects.bulk_create(
-                    modules,
+                    modules_to_create,
                     update_conflicts=True,
-                    unique_fields=['learning_path', 'module_name'],
-                    update_fields=['topic']
+                    update_fields=['topic'],  # Field to update if conflict
+                    unique_fields=['learning_path', 'module_name']  # Matches model constraint
                 )
 
             # Cache Setup
