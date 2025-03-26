@@ -582,13 +582,13 @@ def generate_learning_paths(request):
                 learning_path, _ = LearningPath.objects.get_or_create(course=course, path_name=path["path_name"])
                 
                 for module_name in path["modules"]:
-                    Module.objects.get_or_create(learning_path=learning_path, module_name=module_name)
+                    Module.objects.get_or_create(learning_path=learning_path, module_name=module_name, defaults={'topic': module_name})
                     
             return Response({"message": "Learning paths generated successfully!", "learning_paths": data["learning_paths"]}, status=201)
         else:
             return Response({"error": "Unexpected response from AI."}, status=500)
     
-    except json.JSONDecodedError as e:
+    except json.JSONDecodeError as e:
         print("JSON PARSE ERROR:", e)
         print("Problematic text:", response_text)
         return Response({"error": "Invalid JSON format from AI."}, status=500)
