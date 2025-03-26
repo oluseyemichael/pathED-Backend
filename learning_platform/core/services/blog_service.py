@@ -5,7 +5,7 @@ import requests
 load_dotenv()
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 
-def get_blog_posts(topic):
+def get_blog_posts(topic, timeout=5):
     try:
         # Adjust query for learning-focused results
         params = {
@@ -15,7 +15,7 @@ def get_blog_posts(topic):
             "num": 3,  # Get a few results to filter for relevance
             "api_key": SERPAPI_KEY
         }
-        response = requests.get("https://serpapi.com/search", params=params)
+        response = requests.get("https://serpapi.com/search", params=params, timeout=timeout)
         response.raise_for_status()  # Raises HTTPError for bad responses
 
         search_results = response.json()

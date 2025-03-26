@@ -21,7 +21,7 @@ def calculate_text_similarity(a, b):
     b_clean = re.sub(r'[^\w\s]', '', b.lower())
     return SequenceMatcher(None, a_clean, b_clean).ratio()
 
-def get_youtube_videos(topic, max_results=10, similarity_threshold=0.6):
+def get_youtube_videos(topic, max_results=10, similarity_threshold=0.6, timeout=10):
     """
     Search YouTube videos with strict language and relevance filtering.
     """
@@ -30,6 +30,7 @@ def get_youtube_videos(topic, max_results=10, similarity_threshold=0.6):
 
     try:
         youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
+        # youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY, cache_discovery=False, requestBuilder=lambda *args, **kwargs: build.HttpRequest(*args, timeout=timeout, **kwargs))
         all_videos = []
 
         # Define primary language and region filters

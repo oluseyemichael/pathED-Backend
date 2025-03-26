@@ -7,7 +7,30 @@ from django.core.validators import EmailValidator
 from django.utils import timezone
 from django.db.models import Q
 import math
+from functools import wraps
+from django.db import DatabaseError
+import time
 
+def circuit_breaker(max_failures=3, timeout=60):
+    def decorator(func):
+        failures = 0
+        last_failure = 0
+        
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            nonlocal failures, last_failure
+            if failures >= max_failures and time.time() - last_failure < timeout:
+                raise DatabaseError("Service temporarily unavailable")
+            try:
+                result = func(*args, **kwargs)
+                failures = 0
+                return result
+            except Exception as e:
+                failures += 1
+                last_failure = time.time()
+                raise
+        return wrapper
+    return decorator
 
 # User model
 class User(AbstractUser):
@@ -54,6 +77,7 @@ class Module(models.Model):
     video_link = models.CharField(max_length=500, blank=True)
     blog_link = models.CharField(max_length=500, blank=True)
 
+    @circuit_breaker()
     def save(self, *args, **kwargs):
         # Fetch potential YouTube videos for the module topic
         youtube_videos = get_youtube_videos(self.topic)

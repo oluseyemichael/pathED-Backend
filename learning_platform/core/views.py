@@ -29,9 +29,12 @@ from rest_framework.decorators import action
 from .services.quiz_generation_service import (
     fetch_video_transcript, fetch_video_description, generate_quiz_with_chat_api, generate_default_quiz, generate_quiz_from_module
 )
+from rest_framework.permissions import IsAdminUser 
 import os
 import json
 import google.generativeai as genai
+from django.db import transaction
+from django.core.cache import cache
 import logging
 logger = logging.getLogger(__name__)
 
@@ -541,31 +544,39 @@ def generate_quiz_from_video(request, module_id):
 
 @api_view(["POST"])
 def generate_learning_paths(request):
-    user_input = request.data.get("course_name", "").strip() # Get course name from user
+    user_input = request.data.get("course_name", "").strip()
+    cache_key = f"learning_paths_{user_input.lower().replace(' ', '_')}"
+    
+    # Cache check first
+    cached_response = cache.get(cache_key)
+    if cached_response:
+        return Response({
+            "message": "Learning paths fetched from cache.",
+            "data": cached_response,
+            "from_cache": True
+        }, status=200)
     
     if not user_input:
         return Response({"error": "Course name is required."}, status=400)
     
-    # Check if course already exists
-    course, _ = Course.objects.get_or_create(course_name=user_input)
-    
-    # AI Prompt
-    model = genai.GenerativeModel("gemini-2.0-flash")
-    prompt = (
-        f"You are an expert educator designing structured learning paths for students."
-        f"Generate multiple learning paths for {user_input}, each containing 5-8 modules as pure JSON array."
-        f"Return output **only in JSON format** with this structure:\n\n"
-        f"Use this structure WITHOUT markdown: "
-        f'{{ "learning_paths": [{{ "path_name": "string", "modules": ["string"] }}] }}'
-    )
-    
     try:
+        # AI Prompt
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        prompt = (
+            f"You are an expert educator designing structured learning paths for students.\n"
+            f"Generate multiple learning paths for {user_input} as JSON with:\n"
+            f"- 3-5 learning paths\n"
+            f"- Each with 5-8 modules\n"
+            f"Each module must have:\n"
+            f"- A module_name (short title)\n"
+            f"- A detailed topic for content generation\n"
+            f"Format:\n"
+            f'{{ "learning_paths": [{{ "path_name": "string", '
+            f'"modules": [{{ "module_name": "string", "topic": "string" }}] }}] }}'
+        )
+        
         response = model.generate_content(prompt)
         
-        # Print raw response for debugging
-        # print("RAW RESPONSE:", response)
-        
-    
         if hasattr(response, "candidates") and response.candidates:
             response_text = response.candidates[0].content.parts[0].text
             
@@ -573,22 +584,66 @@ def generate_learning_paths(request):
             response_text = response_text.strip().lstrip('json').strip()
             response_text = response_text.replace('```json', '').replace('```', '')
             
-            print("CLEANED TEXT:", response_text)  # Debugging output
-
-            data = json.loads(response_text) # Parse AI response into JSON
-        
-            # Save to database
-            for path in data.get("learning_paths", []):
-                learning_path, _ = LearningPath.objects.get_or_create(course=course, path_name=path["path_name"])
+            print("CLEANED TEXT:", response_text)
+            data = json.loads(response_text)
+            
+            # Save to database (BATCH OPERATIONS)
+            with transaction.atomic():
+                course, _ = Course.objects.get_or_create(course_name=user_input)
                 
-                for module_name in path["modules"]:
-                    Module.objects.get_or_create(learning_path=learning_path, module_name=module_name, defaults={'topic': module_name})
-                    
-            return Response({"message": "Learning paths generated successfully!", "learning_paths": data["learning_paths"]}, status=201)
-        else:
-            return Response({"error": "Unexpected response from AI."}, status=500)
+                # Bulk create learning paths
+                paths = [LearningPath(course=course, path_name=lp["path_name"]) 
+                        for lp in data["learning_paths"]]  # Fixed indentation
+                LearningPath.objects.bulk_create(paths, ignore_conflicts=True)
+                
+                # Bulk create modules
+                modules = []
+                for lp in data["learning_paths"]:
+                    learning_path = LearningPath.objects.get(
+                        course=course, 
+                        path_name=lp["path_name"]
+                    )
+                    # FIX: Changed mod["name"] to mod["module_name"]
+                    modules.extend([
+                        Module(
+                            learning_path=learning_path,
+                            module_name=mod["module_name"],  # CORRECTED KEY
+                            topic=mod["topic"]
+                        ) for mod in lp["modules"]
+                    ])
+                
+                Module.objects.bulk_create(
+                    modules,
+                    update_conflicts=True,  # Added to update existing entries
+                    unique_fields=['learning_path', 'module_name'],
+                    update_fields=['topic']  # Update topic if module exists
+                )
+
+            # Cache Setup
+            serialized_data = LearningPathSerializer(
+                LearningPath.objects.filter(course=course).prefetch_related('modules'),
+                many=True
+            ).data
+            
+            cache.set(cache_key, serialized_data, timeout=86400)
+            
+            return Response({
+                "message": "New learning paths generated",
+                "data": serialized_data,
+                "from_cache": False
+            }, status=201)
+
+    except Exception as e:
+        logger.error(f"Generation Error: {str(e)}")
+        return Response({"error": str(e)}, status=500)
     
-    except json.JSONDecodeError as e:
-        print("JSON PARSE ERROR:", e)
-        print("Problematic text:", response_text)
-        return Response({"error": "Invalid JSON format from AI."}, status=500)
+@api_view(["POST"])
+@permission_classes([IsAdminUser])
+def invalidate_learning_path_cache(request):
+    course_name = request.data.get("course_name")
+    if not course_name:
+        return Response({"error": "Course name required"}, status=400)
+    
+    cache_key = f"learning_paths_{course_name.lower().replace(' ', '_')}"
+    cache.delete(cache_key)
+    return Response({"message": f"Cache invalidated for {course_name}"})

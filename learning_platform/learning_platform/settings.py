@@ -229,3 +229,16 @@ EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool)
 FRONTEND_URL = "https://path-ed.vercel.app"  # Frontend url for email verification
 
 django_heroku.settings(locals())
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.getenv("REDISCLOUD_URL",),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "SOCKET_CONNECT_TIMEOUT": 5,  # 5 seconds
+            "SOCKET_TIMEOUT": 5,          # 5 seconds
+            "SSL": True,                   # Enable SSL for Redis Cloud
+            "IGNORE_EXCEPTIONS": True,     # Prevent cache failures from breaking app
+        }
+    }
+}
