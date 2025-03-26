@@ -569,7 +569,9 @@ def generate_learning_paths(request):
             f"- Each with 5-8 modules\n"
             f"Each module must have:\n"
             f"- A module_name (short title)\n"
-            f"- A detailed topic for content generation\n"
+            f"- A detailed topic with no more than 300 words for content generation\n"
+            f"- Topics should be search-friendly phrases (not full sentences)\n"
+            f"- Format topics as: 'Key concept; Related terms; Main technology'\n"
             f"Format:\n"
             f'{{ "learning_paths": [{{ "path_name": "string", '
             f'"modules": [{{ "module_name": "string", "topic": "string" }}] }}] }}'

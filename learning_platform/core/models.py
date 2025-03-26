@@ -76,7 +76,7 @@ class LearningPath(models.Model):
 class Module(models.Model):
     module_name = models.CharField(max_length=255)
     learning_path = models.ForeignKey(LearningPath, related_name='modules', on_delete=models.CASCADE)
-    topic = models.CharField(max_length=255)
+    topic = models.TextField()
     video_link = models.CharField(max_length=500, blank=True)
     blog_link = models.CharField(max_length=500, blank=True)
 
