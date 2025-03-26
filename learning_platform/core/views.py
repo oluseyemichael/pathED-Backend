@@ -553,8 +553,9 @@ def generate_learning_paths(request):
     model = genai.GenerativeModel("gemini-2.0-flash")
     prompt = (
         f"You are an expert educator designing structured learning paths for students."
-        f"Generate multiple learning paths for {user_input}, each containing 5-8 modules."
+        f"Generate multiple learning paths for {user_input}, each containing 5-8 modules as pure JSON array."
         f"Return output **only in JSON format** with this structure:\n\n"
+        f"Use this structure WITHOUT markdown: "
         f'{{ "learning_paths": [{{ "path_name": "string", "modules": ["string"] }}] }}'
     )
     
@@ -562,28 +563,32 @@ def generate_learning_paths(request):
         response = model.generate_content(prompt)
         
         # Print raw response for debugging
-        print("RAW RESPONSE:", response)
+        # print("RAW RESPONSE:", response)
         
     
         if hasattr(response, "candidates") and response.candidates:
             response_text = response.candidates[0].content.parts[0].text
-        else:
-            return Response({"error": "Unexpected AI response structure."}, status=500)
-
-        print("EXTRACTED TEXT:", response_text)  # Debugging output
-        
-        data = json.loads(response_text) # Parse AI response into JSON
-        
-        for path in data.get("learning_paths", []):
-            learning_path, _ = LearningPath.objects.get_or_create(course=course, path_name=path["path_name"])
             
-            for module_name in path["modules"]:
-                Module.objects.get_or_create(learning_path=learning_path, module_name=module_name)
-                
-        return Response({"message": "Learning paths generated successfully!", "learning_paths": data["learning_paths"]}, status=201)
-    
-    except json.JSONDecodeError:
-        return Response({"error": "Failed to parse AI response."}, status=500)
+            # Clean the response text
+            response_text = response_text.strip().lstrip('json').strip()
+            response_text = response_text.replace('```json', '').replace('```', '')
+            
+            print("CLEANED TEXT:", response_text)  # Debugging output
 
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
+            data = json.loads(response_text) # Parse AI response into JSON
+        
+            # Save to database
+            for path in data.get("learning_paths", []):
+                learning_path, _ = LearningPath.objects.get_or_create(course=course, path_name=path["path_name"])
+                
+                for module_name in path["modules"]:
+                    Module.objects.get_or_create(learning_path=learning_path, module_name=module_name)
+                    
+            return Response({"message": "Learning paths generated successfully!", "learning_paths": data["learning_paths"]}, status=201)
+        else:
+            return Response({"error": "Unexpected response from AI."}, status=500)
+    
+    except json.JSONDecodedError as e:
+        print("JSON PARSE ERROR:", e)
+        print("Problematic text:", response_text)
+        return Response({"error": "Invalid JSON format from AI."}, status=500)
