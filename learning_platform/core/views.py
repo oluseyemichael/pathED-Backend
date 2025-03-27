@@ -35,7 +35,7 @@ import json
 import google.generativeai as genai
 from django.db import transaction
 from django.core.cache import cache
-from .tasks import process_module_content
+from .tasks import fetch_module_content
 import logging
 logger = logging.getLogger(__name__)
 
@@ -544,6 +544,7 @@ def generate_quiz_from_video(request, module_id):
         return Response({"error": str(e)}, status=500)
 
 @api_view(["POST"])
+@transaction.atomic
 def generate_learning_paths(request):
     user_input = request.data.get("course_name", "").strip()
     cache_key = f"learning_paths_{user_input.lower().replace(' ', '_')}"
@@ -565,7 +566,7 @@ def generate_learning_paths(request):
         model = genai.GenerativeModel("gemini-2.0-flash")
         prompt = (
             f"You are an expert educator designing structured learning paths for students.\n"
-            f"Generate multiple learning paths logically, for {user_input} as JSON with:\n"
+            f"Generate multiple learning paths logically, with concise, search-friendly topics. Example format: 'Introduction to Vectors' instead of 'Vector space axioms; Subspaces'. for {user_input} as JSON with:\n"
             f"- 3-5 learning paths\n"
             f"- Each with 5-8 modules\n"
             f"Each module must have:\n"
@@ -659,7 +660,10 @@ def generate_learning_paths(request):
                     logger.error(f"Content gen failed for {module.module_name}: {str(e)}")
                     continue
             
-
+            for module in modules_to_process:
+                fetch_module_content.delay(module.id) # Async call
+                return Response({"message": "Learning paths generation started"})
+            
             # Cache Setup
             serialized_data = LearningPathSerializer(
                 LearningPath.objects.filter(course=course).prefetch_related('modules'),
