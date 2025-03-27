@@ -627,14 +627,15 @@ def generate_learning_paths(request):
                     module_name__in=[m["module_name"] for m in lp_data["modules"]]
                 ).delete()
                 
-                # Prepare new modules
-                all_modules.extend([
-                    Module(
+                # Process each module individually
+                for mod in lp_data["modules"]:
+                    module, created = Module.objects.update_or_create(
                         learning_path=path,
                         module_name=mod["module_name"],
-                        topic=mod["topic"][:500]  # Truncate to 500 chars
-                    ) for mod in lp_data["modules"]
-                ])
+                        defaults={"topic": mod["topic"][:500]}
+                    )
+                    if created or not module.video_link:  # Force save() if new or missing links
+                        module.save()  # Triggers video/blog fetching
             
             # Bulk create/update modules
             Module.objects.bulk_create(
