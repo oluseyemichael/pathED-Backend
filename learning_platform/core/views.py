@@ -35,7 +35,7 @@ import json
 import google.generativeai as genai
 from django.db import transaction
 from django.core.cache import cache
-from .tasks import fetch_module_content
+from .tasks import fetch_module_content, fetch_video_links
 import logging
 logger = logging.getLogger(__name__)
 
@@ -566,7 +566,9 @@ def generate_learning_paths(request):
         model = genai.GenerativeModel("gemini-2.0-flash")
         prompt = (
             f"You are an expert educator designing structured learning paths for students.\n"
-            f"Generate multiple learning paths logically, with concise, search-friendly topics. Example format: 'Introduction to Vectors' instead of 'Vector space axioms; Subspaces'. for {user_input} as JSON with:\n"
+            f"Generate multiple learning paths logically with concise, natural-language topics optimized for YouTube searches. Example format: 'Introduction to Vectors' instead of technical jargon. \n"
+            f"Structure: 'Primary concept - Secondary concept - Key technology' \n" 
+            f"for {user_input} as JSON with:\n"
             f"- 3-5 learning paths\n"
             f"- Each with 5-8 modules\n"
             f"Each module must have:\n"
@@ -652,16 +654,16 @@ def generate_learning_paths(request):
                 video_link__isnull=True
             ).select_related('learning_path')
 
-            for module in modules_to_process:
-                try:
-                    # This save() triggers YouTube/blog service calls
-                    module.save()  
-                except Exception as e:
-                    logger.error(f"Content gen failed for {module.module_name}: {str(e)}")
-                    continue
+            # for module in modules_to_process:
+            #     try:
+            #         # This save() triggers YouTube/blog service calls
+            #         module.save()  
+            #     except Exception as e:
+            #         logger.error(f"Content gen failed for {module.module_name}: {str(e)}")
+            #         continue
             
             for module in modules_to_process:
-                fetch_module_content.delay(module.id) # Async call
+                fetch_video_links.delay(module.id) # Async call
                 return Response({"message": "Learning paths generation started"})
             
             # Cache Setup

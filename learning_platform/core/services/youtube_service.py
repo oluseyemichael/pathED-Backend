@@ -43,11 +43,11 @@ def get_youtube_videos(topic, max_results=10, similarity_threshold=0.6, timeout=
         primary_region = 'US'      # United States region
 
         request = youtube.search().list(
-            q=topic,
+            q= f"{topic} tutorial",
             part='snippet',
-            maxResults=20,
-            order='relevance',
-            videoDuration='long',  # Videos longer than 20 minutes
+            maxResults=15,
+            order='viewCount',
+            videoDuration='medium',  # Videos longer than 20 minutes
             type='video',
             publishedAfter=published_after,
             relevanceLanguage=relevance_language,

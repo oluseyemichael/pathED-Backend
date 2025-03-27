@@ -1,1 +1,1 @@
-web: gunicorn learning_platform.wsgi --log-file - --timeout 120 --preload
+web: gunicorn learning_platform.wsgi --log-file - --timeout 120 --preload --workers 3
