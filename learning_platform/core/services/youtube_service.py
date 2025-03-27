@@ -6,6 +6,7 @@ import isodate
 from datetime import datetime, timedelta
 import re
 from difflib import SequenceMatcher
+from django.core.cache import cache
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -25,6 +26,10 @@ def get_youtube_videos(topic, max_results=10, similarity_threshold=0.6, timeout=
     """
     Search YouTube videos with strict language and relevance filtering.
     """
+    cache_key = f"youtube_{topic}"
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
     current_year = datetime.now().year
     published_after = f"{current_year - 2}-01-01T00:00:00Z"  # Limit to last 2 years
 

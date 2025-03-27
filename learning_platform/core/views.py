@@ -35,6 +35,7 @@ import json
 import google.generativeai as genai
 from django.db import transaction
 from django.core.cache import cache
+from .tasks import process_module_content
 import logging
 logger = logging.getLogger(__name__)
 
@@ -564,7 +565,7 @@ def generate_learning_paths(request):
         model = genai.GenerativeModel("gemini-2.0-flash")
         prompt = (
             f"You are an expert educator designing structured learning paths for students.\n"
-            f"Generate multiple learning paths for {user_input} as JSON with:\n"
+            f"Generate multiple learning paths logically, for {user_input} as JSON with:\n"
             f"- 3-5 learning paths\n"
             f"- Each with 5-8 modules\n"
             f"Each module must have:\n"
@@ -594,7 +595,7 @@ def generate_learning_paths(request):
             # Get or create course
             course, _ = Course.objects.get_or_create(course_name=user_input)
             
-            # 1. Handle Learning Paths
+            # Handle Learning Paths
             path_names = [lp["path_name"] for lp in data["learning_paths"]]
             
             # Delete existing paths not in the new data
@@ -614,7 +615,7 @@ def generate_learning_paths(request):
                 unique_fields=['course', 'path_name']
             )
             
-            # 2. Handle Modules
+            # Handle Modules
             all_modules = []
             for lp_data in data["learning_paths"]:
                 path = LearningPath.objects.get(
@@ -642,6 +643,21 @@ def generate_learning_paths(request):
                 update_fields=['topic'],
                 unique_fields=['learning_path', 'module_name']
             )
+            
+            # VIDEO/BLOG GENERATION
+            modules_to_process = Module.objects.filter(
+                learning_path__course=course,
+                video_link__isnull=True
+            ).select_related('learning_path')
+
+            for module in modules_to_process:
+                try:
+                    # This save() triggers YouTube/blog service calls
+                    module.save()  
+                except Exception as e:
+                    logger.error(f"Content gen failed for {module.module_name}: {str(e)}")
+                    continue
+            
 
             # Cache Setup
             serialized_data = LearningPathSerializer(
@@ -652,7 +668,7 @@ def generate_learning_paths(request):
             cache.set(cache_key, serialized_data, timeout=86400)
             
             return Response({
-                "message": "New learning paths generated",
+                "message": "Learning paths generated",
                 "data": serialized_data,
                 "from_cache": False
             }, status=201)

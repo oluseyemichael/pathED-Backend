@@ -22,7 +22,7 @@ class UserSerializer(serializers.ModelSerializer):
         return user
 
 class LearningPathSerializer(serializers.ModelSerializer):
-    modules = serializers.StringRelatedField(many=True)
+    modules = serializers.StringRelatedField(many=True, source='modules.all')
 
     class Meta:
         model = LearningPath
